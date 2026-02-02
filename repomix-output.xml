@@ -1,0 +1,241 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+package.json
+README.md
+src/core/pop3.ts
+src/core/socket.ts
+src/main.ts
+src/parser/filter.ts
+src/parser/mime.ts
+src/utils
+tests
+tsconfig.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="package.json">
+{
+    "name": "pop3-secure-client",
+    "version": "1.0.0",
+    "description": "Cliente POP3 Seguro para Redes",
+    "main": "dist/main.js",
+    "scripts": {
+        "start": "ts-node src/main.ts",
+        "build": "tsc"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "ts-node": "^10.9.0",
+        "typescript": "^5.0.0"
+    }
+}
+</file>
+
+<file path="src/core/pop3.ts">
+import { SecureSocket } from './socket';
+
+export class POP3Client {
+    private socket: SecureSocket;
+
+    constructor() {
+        this.socket = new SecureSocket();
+    }
+
+    async authenticate(host: string, user: string, pass: string) {
+        const greeting = await this.socket.connect(host, 995);
+        console.log('S:', greeting.trim());
+
+        const userRes = await this.socket.sendCommand(`USER ${user}`);
+        console.log('C: USER', user, '-> S:', userRes.trim());
+
+        const passRes = await this.socket.sendCommand(`PASS ${pass}`);
+        console.log('C: PASS **** -> S:', passRes.trim());
+        
+        if (!passRes.startsWith('+OK')) throw new Error("Autenticación fallida");
+    }
+
+    async getStats() {
+        const res = await this.socket.sendCommand('STAT');
+        // El formato es +OK [num_mensajes] [tamaño_total]
+        const parts = res.split(' ');
+        return parseInt(parts[1]);
+    }
+
+    // Agrega esto dentro de tu clase POP3Client
+    async getSecureEmail(id: number) {
+        const rawData = await this.socket.sendCommand(`RETR ${id}`);
+        const result = EmailFilter.processContent(rawData);
+        return result;
+    }
+}
+</file>
+
+<file path="src/core/socket.ts">
+import * as tls from 'tls';
+
+export class SecureSocket {
+    private client?: tls.TLSSocket;
+
+    connect(host: string, port: number): Promise<string> {
+        return new Promise((resolve, reject) => {
+            this.client = tls.connect(port, host, { rejectUnauthorized: false }, () => {
+                console.log(`[Red] Conexión TLS establecida con ${host}:${port}`);
+            });
+
+            // El servidor POP3 siempre envía un saludo inicial (+OK)
+            this.client.once('data', (data) => {
+                resolve(data.toString());
+            });
+
+            this.client.on('error', (err) => reject(err));
+        });
+    }
+
+    //Método para enviar comandos al servidor
+    sendCommand(command: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            if (!this.client) return reject("Socket no conectado");
+
+            // En POP3 los comandos terminan en CRLF (\r\n)
+            this.client.write(`${command}\r\n`);
+
+            this.client.once('data', (data) => {
+                resolve(data.toString());
+            });
+        });
+    }
+
+    close() {
+        this.client?.end();
+    }
+}
+</file>
+
+<file path="src/main.ts">
+
+</file>
+
+<file path="src/parser/filter.ts">
+export class EmailFilter {
+    // Definimos los tipos prohibidos según el requerimiento
+    private static BANNED_TYPES = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+        'image/gif'
+    ];
+
+    static processContent(rawEmail: string): { subject: string, body: string, blockedCount: number } {
+        const lines = rawEmail.split('\n');
+        let body = "";
+        let subject = "Sin Asunto";
+        let blockedCount = 0;
+        let isSkippingAttachment = false;
+
+        for (const line of lines) {
+            // 1. Extraer el Asunto
+            if (line.startsWith('Subject:')) {
+                subject = line.replace('Subject:', '').trim();
+            }
+
+            // 2. Detectar inicio de adjunto prohibido
+            if (line.toLowerCase().includes('content-type:')) {
+                const foundBanned = this.BANNED_TYPES.find(type => line.toLowerCase().includes(type));
+                if (foundBanned) {
+                    isSkippingAttachment = true;
+                    blockedCount++;
+                    body += `\n[BLOQUEADO] Se detectó y omitió un archivo de tipo: ${foundBanned}\n`;
+                    continue;
+                }
+            }
+
+            // 3. Si encontramos una nueva parte del correo (boundary), dejamos de omitir
+            if (line.startsWith('--')) {
+                isSkippingAttachment = false;
+            }
+
+            // 4. Solo agregamos al cuerpo si no es un adjunto prohibido
+            if (!isSkippingAttachment && !line.startsWith('Content-')) {
+                body += line + '\n';
+            }
+        }
+
+        return { subject, body: body.trim(), blockedCount };
+    }
+}
+</file>
+
+<file path="src/parser/mime.ts">
+
+</file>
+
+<file path="src/utils">
+
+</file>
+
+<file path="tests">
+
+</file>
+
+<file path="tsconfig.json">
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "CommonJS",
+        "rootDir": "./src",
+        "outDir": "./dist",
+        "esModuleInterop": true,
+        "strict": true,
+        "skipLibCheck": true
+    }
+}
+</file>
+
+<file path="README.md">
+# Redes
+trabajo-practico-de-redes-de-computadoras
+</file>
+
+</files>
