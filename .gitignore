@@ -1,0 +1,17 @@
+# Dependencias (No se suben porque se instalan con npm install)
+node_modules/
+
+# Archivos de compilación (JavaScript generado)
+dist/
+
+# Archivos de entorno y logs
+npm-debug.log*
+.env
+
+# Archivos del Sistema Operativo
+.DS_Store
+Thumbs.db
+
+# Configuración de editores
+.vscode/
+.idea/
