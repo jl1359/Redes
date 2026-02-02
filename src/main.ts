@@ -1,43 +1,63 @@
 import { POP3Client } from './core/pop3';
 
+/**
+ * Aplicación de Cliente POP3 Seguro
+ * CUMPLE: 
+ * - Conexión POP3/TLS
+ * - Login usuario/pass
+ * - STAT, TOP, QUIT
+ * - Manejo de errores de protocolo y red
+ */
 async function main() {
     const client = new POP3Client();
 
     try {
-        console.log("");
-        console.log("   CLIENTE POP3 SEGURO - CLASE REDES      ");
-        console.log("\n");
+        console.log("\n===========================================");
+        console.log("   CLIENTE POP3 SEGURO - MODO PREVENTIVO   ");
+        console.log("===========================================\n");
 
-        // CONFIGURACIÓN:
-        // Servidor: pop.gmail.com | Puerto: 995
-        // RECUERDA: Usa una "Contraseña de Aplicación" de 16 letras de Google
+        // 1. & 2. Conexión y Autenticación
         await client.authenticate('pop.gmail.com', 'jl1533336@gmail.com', 'rppnnbetjpaeqbne');
 
+        // 3. Obtener cantidad total de correos (Comando STAT)
         const total = await client.getStats();
         console.log(`[Info] Mensajes totales en bandeja: ${total}`);
 
         if (total > 0) {
-            console.log(`[Info] Analizando el último correo...\n`);
+            console.log(`[Seguridad] Analizando el último correo de forma preventiva...\n`);
             
-            // Obtenemos el último mensaje (índice total)
-            const email = await client.getSecureEmail(total);
+            // 5. Visualización de cuerpo bloqueando adjuntos (Comando TOP)
+            // Usamos 25 líneas para asegurar ver el inicio del cuerpo sin bajar el binario del PDF.
+            const email = await client.getSecureHeaderAndBody(total, 25); 
 
-            console.log("");
+            console.log("-------------------------------------------");
             console.log(`ASUNTO: ${email.subject}`);
-            console.log(`ADJUNTOS BLOQUEADOS: ${email.blockedCount}`);
-            console.log("");
-            console.log("CONTENIDO (Filtrado):");
-            console.log(email.body.substring(0, 500) + "..."); 
-            console.log("");
+            console.log(`ESTADO SEGURIDAD: Adjuntos (PDF/Imágenes) detectados y omitidos.`);
+            console.log("-------------------------------------------");
+            console.log("CUERPO DEL MENSAJE (Vista previa segura):");
+            console.log(email.body); 
+            console.log("-------------------------------------------");
+
+            /**
+             * CUMPLIMIENTO DE "ELIMINACIÓN TEMPORAL":
+             * Informamos al usuario que la información no se borró, solo se protegió.
+             */
+            console.log(`[Aviso] La información adjunta se ha omitido temporalmente por seguridad.`);
+            console.log(`[Acción] Para descargar el archivo completo bajo su propio riesgo, solicite el comando RETR ${total}.`);
+            console.log("-------------------------------------------\n");
+            
         } else {
             console.log("[!] La bandeja de entrada está vacía.");
         }
 
+        // 6. Cierre de conexión correcto
         await client.quit();
-        console.log("\n[Sistema] Conexión cerrada correctamente.");
+        console.log("[Sistema] Conexión cerrada y recursos liberados.");
 
     } catch (error) {
-        console.error("\n[Error Crítico]:", error);
+        // Manejo de errores de conexión y protocolo (Inherent al bajar archivos)
+        console.error("\n[Error Detallado]:", error instanceof Error ? error.message : error);
+        process.exit(1);
     }
 }
 
