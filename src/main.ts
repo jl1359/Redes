@@ -11,7 +11,7 @@ async function main() {
         // CONFIGURACIÓN:
         // Servidor: pop.gmail.com | Puerto: 995
         // RECUERDA: Usa una "Contraseña de Aplicación" de 16 letras de Google
-        await client.authenticate('pop.gmail.com', 'TU_CORREO@gmail.com', 'TU_CONTRASEÑA_APP');
+        await client.authenticate('pop.gmail.com', 'jl1533336@gmail.com', 'rppnnbetjpaeqbne');
 
         const total = await client.getStats();
         console.log(`[Info] Mensajes totales en bandeja: ${total}`);
